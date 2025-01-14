@@ -73,9 +73,17 @@ async function run() {
         // console.log(user)
         res.send(result)
     })
+
     // Scholar related api
     app.get('/scholars', async(req, res)=>{
         const result= await scholarCollections.find().toArray()
+        res.send(result)
+    })
+    
+    app.post('/scholarship', async(req, res)=>{
+        const scholarData= req.body
+        console.log(scholarData)
+        const result = await scholarCollections.insertOne(scholarData)
         res.send(result)
     })
     // Send a ping to confirm a successful connection
