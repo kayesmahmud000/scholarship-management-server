@@ -1,7 +1,8 @@
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const jwt= require('jsonwebtoken')
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app= express()
 const port= process.env.PORT || 5000
 
@@ -30,10 +31,33 @@ async function run() {
     const usersCollections= client.db('ScholarProDB').collection('users')
 
 
-    
+    //jwt related api
+
+    app.post('/jwt' , async(req, res)=>{
+        const user =req.body
+        const token= jwt.sign(user, process.env.SECRET_TOKEN, {expiresIn: '30d'})
+
+        res.send({token})
+    })
 
     // User related api
 
+    app.get('/users', async(req , res)=>{
+        const result= await usersCollections.find().toArray()
+        res.send(result)
+    })
+    app.patch('/user/:email', async(req, res)=>{
+        const email= req.params.email
+        const filter= {email}
+        const {role}= req.body
+        const updateDoc={
+            $set:{
+                role
+            }
+        }
+        const result= await usersCollections.updateOne(filter, updateDoc)
+        res.send(result)
+    })
     app.post('/users/:email', async(req,res)=>{
         const email= req.params.email
         const user= req.body
