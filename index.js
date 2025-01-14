@@ -27,13 +27,33 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     const scholarCollections= client.db('ScholarProDB').collection('scholarships')
+    const usersCollections= client.db('ScholarProDB').collection('users')
 
+
+    
+
+    // User related api
+
+    app.post('/users/:email', async(req,res)=>{
+        const email= req.params.email
+        const user= req.body
+        const query = {email}
+        const isExist= await usersCollections.findOne(query)
+        if(isExist){
+            return res.send(isExist)
+        }
+        const result= await usersCollections.insertOne({...user,
+            role:'user',
+            timeStamp: Date.now()
+        })
+        // console.log(user)
+        res.send(result)
+    })
+    // Scholar related api
     app.get('/scholars', async(req, res)=>{
         const result= await scholarCollections.find().toArray()
         res.send(result)
     })
-
-
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
