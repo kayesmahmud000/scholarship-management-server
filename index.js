@@ -73,13 +73,68 @@ async function run() {
         // console.log(user)
         res.send(result)
     })
+    app.delete('/user/:id', async(req, res)=>{
+        const id =req.params.id
+        const query= {_id: new ObjectId(id)}
+        const result = await usersCollections.deleteOne(query)
+        res.send(result)
+    })
 
     // Scholar related api
     app.get('/scholars', async(req, res)=>{
         const result= await scholarCollections.find().toArray()
         res.send(result)
     })
+
+    app.get('/scholar/:id', async(req, res)=>{
+        const id= req.params.id
+        const query={_id:new ObjectId(id)}
+        const result= await scholarCollections.findOne(query)
+        res.send(result)
+    })
     
+    app.delete('/scholar/:id', async(req, res)=>{
+        const id= req.params.id
+        const query= {_id: new ObjectId(id)}
+        const result= await scholarCollections.deleteOne(query)
+        res.send(result)
+    })
+    
+    app.put('/scholar/:id', async(req, res)=>{
+        const id = req.params.id
+        const filter= {_id: new ObjectId(id)}
+        const {scholarshipName,
+            universityName,
+            universityCountry,
+            universityCity,
+            universityWorldRank,
+            subjectCategory,
+            scholarshipCategory,
+            degree,
+            tuitionFees,
+            applicationFees,
+            serviceCharge,
+            applicationDeadline}= req.body
+        const updateDoc= {
+            $set:{
+                scholarshipName,
+                universityName,
+                universityCountry,
+                universityCity,
+                universityWorldRank,
+                subjectCategory,
+                scholarshipCategory,
+                degree,
+                tuitionFees,
+                applicationFees,
+                serviceCharge,
+                applicationDeadline
+            }
+        }
+
+        const result= await scholarCollections.updateOne(filter, updateDoc)
+        res.send(result)
+    })
     app.post('/scholarship', async(req, res)=>{
         const scholarData= req.body
         console.log(scholarData)
