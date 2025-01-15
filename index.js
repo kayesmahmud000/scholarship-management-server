@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const jwt= require('jsonwebtoken')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const app= express()
 const port= process.env.PORT || 5000
 
@@ -132,7 +133,7 @@ async function run() {
         const result= await usersCollections.find().toArray()
         res.send(result)
     })
-    app.patch('/user/:email', async(req, res)=>{
+    app.patch('/user/:email',  verifyAdmin, async(req, res)=>{
         const email= req.params.email
         const filter= {email}
         const {role}= req.body
@@ -159,7 +160,7 @@ async function run() {
         // console.log(user)
         res.send(result)
     })
-    app.delete('/user/:id', async(req, res)=>{
+    app.delete('/user/:id', verifyToken, verifyAdmin, async(req, res)=>{
         const id =req.params.id
         const query= {_id: new ObjectId(id)}
         const result = await usersCollections.deleteOne(query)
@@ -167,7 +168,7 @@ async function run() {
     })
 
     // role base api
-    app.get('/user/role/:email', verifyToken,  async(req, res)=>{
+    app.get('/user/role/:email', verifyToken,   async(req, res)=>{
         const email = req.params.email
         const query= {email}
         const result = await usersCollections.findOne(query)
@@ -182,21 +183,21 @@ async function run() {
         res.send(result)
     })
 
-    app.get('/scholar/:id', async(req, res)=>{
+    app.get('/scholar/:id', verifyToken, async(req, res)=>{
         const id= req.params.id
         const query={_id:new ObjectId(id)}
         const result= await scholarCollections.findOne(query)
         res.send(result)
     })
     
-    app.delete('/scholar/:id', async(req, res)=>{
+    app.delete('/scholar/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
         const id= req.params.id
         const query= {_id: new ObjectId(id)}
         const result= await scholarCollections.deleteOne(query)
         res.send(result)
     })
 
-    app.put('/scholar/:id', async(req, res)=>{
+    app.put('/scholar/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
         const id = req.params.id
         const filter= {_id: new ObjectId(id)}
         const {scholarshipName,
@@ -237,6 +238,26 @@ async function run() {
         const result = await scholarCollections.insertOne(scholarData)
         res.send(result)
     })
+
+    // create payment intent
+
+    app.post('/create-payment-intent', verifyToken, async(req, res)=>{
+        const {applicationFee}= req.body
+      const amount = parseInt(applicationFee* 100)
+      const paymentIntent= await  stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types:['card']
+      })
+      res.send({
+        client_secret: paymentIntent.client_secret
+      })
+    })
+
+ 
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
