@@ -33,16 +33,102 @@ async function run() {
 
     //jwt related api
 
-    app.post('/jwt' , async(req, res)=>{
-        const user =req.body
-        const token= jwt.sign(user, process.env.SECRET_TOKEN, {expiresIn: '30d'})
+    app.post('/jwt', async (req, res) => {
+        const user = req.body;
+        const token = jwt.sign(user, process.env.SECRET_TOKEN, { expiresIn: '30d' });
+        res.send({ token });
+    });
+    
+    // Middleware for Token Verification
+    const verifyToken = (req, res, next) => {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).send({ message: 'Unauthorized access' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        jwt.verify(token, process.env.SECRET_TOKEN, (err, decoded) => {
+            if (err) {
+                return res.status(403).send({ message: 'Forbidden access' });
+            }
+            req.decoded = decoded;
+            next();
+        });
+    };
+    
+    // Verify Admin or Moderator
+    const verifyAdminAndModerator = async (req, res, next) => {
+        const email = req.decoded?.email;
+        const query = { email };
+        const result = await usersCollections.findOne(query);
+        if (!result || result.role === 'user') {
+            return res.status(403).send({ message: "Forbidden! Admin and Moderator only." });
+        }
+        next();
+    };
+    
+    // Verify Admin Only
+    const verifyAdmin = async (req, res, next) => {
+        const email = req.decoded?.email;
+        const query = { email };
+        const result = await usersCollections.findOne(query);
+        if (!result || result.role !== 'admin') {
+            return res.status(403).send({ message: "Forbidden! Admin only action." });
+        }
+        next();
+    };
+    
 
-        res.send({token})
-    })
+    // app.post('/jwt' , async(req, res)=>{
+    //     const user =req.body
+    //     const token= jwt.sign(user, process.env.SECRET_TOKEN, {expiresIn: '30d'})
+
+    //     res.send({token})
+    // })
+
+    // // middleware
+
+    // const verifyToken=async (req, res, next)=>{
+    //     console.log('inside Verify token->' ,req.headers)
+    //     if(!req?.headers?.authorization){
+    //     return res.status(401).send({massage: 'Unauthorize access'})
+    //     }
+    //     const token= req.headers.authorization.split(' ')[1]
+    //     jwt.verify(token, process.env.SECRET_TOKEN, (err, decoded)=>{
+    //         if(err){
+    //             return res.status(403).send({massage:'Forbidden access'})
+    //         }
+    //         req.decoded = decoded
+    //         next()
+    //     })
+    // }
+
+    // const verifyAdminAndModerator=async (req, res, next)=>{
+    //    // console.log("data from verifyToken middleware", req.user)
+    //    const email = req.user?.email
+    //    const query = { email }
+    //    const result = await usersCollections.findOne(query)
+    //    if (!result || result.role === 'user') {
+    //      return res.status(403).send({ massage: "Forbidden Access!, Admin And Moderator only action" })
+    //    }
+    //    next()
+    // }
+
+    // const verifyAdmin= async(req,res, next)=>{
+    //     const email= req.user?.email
+    //     const query={email}
+    //     const result= await usersCollections.findOne(query)
+    //     if(!result || result.role!== 'admin'){
+    //         return res.status(403).send({massage: "Forbidden Access!, Admin only action"})
+    //     }
+    //     next()
+    // }
+    
+   
 
     // User related api
 
-    app.get('/users', async(req , res)=>{
+    app.get('/users', verifyToken, verifyAdmin,  async(req , res)=>{
         const result= await usersCollections.find().toArray()
         res.send(result)
     })
@@ -80,6 +166,16 @@ async function run() {
         res.send(result)
     })
 
+    // role base api
+    app.get('/user/role/:email', verifyToken,  async(req, res)=>{
+        const email = req.params.email
+        const query= {email}
+        const result = await usersCollections.findOne(query)
+        res.send({role : result?.role})
+
+
+    })
+
     // Scholar related api
     app.get('/scholars', async(req, res)=>{
         const result= await scholarCollections.find().toArray()
@@ -99,7 +195,7 @@ async function run() {
         const result= await scholarCollections.deleteOne(query)
         res.send(result)
     })
-    
+
     app.put('/scholar/:id', async(req, res)=>{
         const id = req.params.id
         const filter= {_id: new ObjectId(id)}
@@ -135,7 +231,7 @@ async function run() {
         const result= await scholarCollections.updateOne(filter, updateDoc)
         res.send(result)
     })
-    app.post('/scholarship', async(req, res)=>{
+    app.post('/scholarship', verifyToken, verifyAdminAndModerator, async(req, res)=>{
         const scholarData= req.body
         console.log(scholarData)
         const result = await scholarCollections.insertOne(scholarData)
