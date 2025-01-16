@@ -244,99 +244,95 @@ async function run() {
 
         //application related Api
 
-
         app.get('/application/:email', async (req, res) => {
-            const email = req.params.email;
-            const query= {applicantEmail : email}
-            console.log(email)
-            const application= await applicationsCollections.findOne(query)
-            // console.log(application)
-            const scholarId= application?.scholarInfo?.scholarId
-            console.log(scholarId)
-            // const result = await applicationsCollections.aggregate([
-            //     {
-            //         $addFields: {
-            //             "scholarInfo.scholarId": {
-            //                 $toObjectId: "$scholarInfo.scholarId"
-            //             }
-            //         }
-            //     },
-            //     {
-            //         $lookup: {
-            //             from: 'scholarships',
-            //             localField: 'scholarInfo.scholarId',
-            //             foreignField: '_id',
-            //             as: 'scholar'
-            //         }
-            //     },
-            //     {
-            //         $unwind: "$scholar"
-            //     },
-            //     {
-            //         $project: {
-            //             universityName: "$scholar.universityName",
-            //             universityCountry: "$scholar.universityCountry", 
-            //             applicationFeedback: "$applicationFeedback",   
-            //             subjectCategory: "$scholar.subjectCategory",  
-            //             appliedDegree: "$scholarInfo.degree",        
-            //             applicationFees: "$scholar.applicationFees",  
-            //             serviceCharge: "$scholar.serviceCharge",      
-            //             applicationStatus: "$status"                
-            //         }
-            //     }
-            // ]).toArray();
-            
-            const result = await applicationsCollections.aggregate([
-                {
-                    $addFields: {
-                        "scholarInfo.scholarId": {
-                            $toObjectId: "$scholarInfo.scholarId"
+            try {
+                const email = req.params.email;
+                const query = { applicantEmail: email };
+        
+                // Using aggregate directly instead of findOne
+                const result = await applicationsCollections.aggregate([
+                    {
+                        $match: query // Matching all applications for the provided email
+                    },
+                    {
+                        $addFields: {
+                            "scholarInfo.scholarId": {
+                                $toObjectId: "$scholarInfo.scholarId"
+                            }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'scholarships',
+                            localField: 'scholarInfo.scholarId',
+                            foreignField: '_id',
+                            as: 'scholar'
+                        }
+                    },
+                    {
+                        $unwind: {
+                            path: "$scholar",
+                            preserveNullAndEmptyArrays: true
+                        }
+                    },
+                    {
+                        $addFields: {
+                            "scholarInfo.universityName": "$scholar.universityName",
+                            "scholarInfo.universityCountry": "$scholar.universityCountry",
+                            "scholarInfo.universityCity": "$scholar.universityCity",
+                            "scholarInfo.applicationFees": "$scholar.applicationFees",
+                            "scholarInfo.serviceCharge": "$scholar.serviceCharge"
+                        }
+                    },
+                    {
+                        $project: {
+                            scholar: 0 // Removing the full scholar object after extracting needed fields
                         }
                     }
-                },
-                {
-                    $lookup: {
-                        from: 'scholarships',
-                        localField: 'scholarInfo.scholarId',
-                        foreignField: '_id',
-                        as: 'scholar'
-                    }
-                },
-                {
-                    $unwind: {
-                        path: "$scholar",
-                        preserveNullAndEmptyArrays: true
-                    }
-                },
-                {
-                    $addFields: {
-                        "scholarInfo.universityName": "$scholar.universityName",
-                        "scholarInfo.universityCountry": "$scholar.universityCountry",
-                        "scholarInfo.universityCity": "$scholar.universityCity",
-                        "scholarInfo.applicationFees": "$scholar.applicationFees",
-                        "scholarInfo.serviceCharge": "$scholar.serviceCharge"
-                    }
-                },
-                {
-                    $project: {
-                        scholar: 0 // Removing the full scholar object after extracting needed fields
-                    }
-                }
-            ]).toArray();
-            
-
-            console.log(result)
-            res.send(result)
+                ]).toArray();
+        
+                res.send(result);
+            } catch (error) {
+                console.error("Error fetching applications:", error);
+                res.status(500).send({ message: "Error fetching applications" });
+            }
         });
-
+        
+        app.delete('/application/:id', verifyToken, async(req, res)=>{
+            const id= req.params.id
+            const query= {_id: new ObjectId(id)}
+            const result= await applicationsCollections.deleteOne(query)
+            res.send(result)
+        })
         app.post('/application', verifyToken, async (req, res) => {
             const application = req.body
             const applyEmail = application.applicantEmail
             const query = { email: applyEmail }
             const user = await usersCollections.findOne(query)
-            console.log(applyEmail)
-            console.log(user._id.toString())
+            // console.log(applyEmail)
+            // console.log(user._id.toString())
             const result = await applicationsCollections.insertOne({ ...application, userId: user._id.toString() })
+            res.send(result)
+        })
+        app.put('/application/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const { phoneNumber, applicantName, applicantEmail, village, district,
+                country, gender, hscResult, studyGap, sscResult } = req.body
+            const filter = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    phoneNumber, applicantName, applicantEmail, village, district,
+                country, gender, hscResult, studyGap, sscResult
+                }
+            }
+            const result = await applicationsCollections.updateOne( filter, updateDoc)
+            res.send(result)
+        })
+        app.get('/applications/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await applicationsCollections.findOne(query)
+            console.log(result)
             res.send(result)
         })
         // create payment intent
