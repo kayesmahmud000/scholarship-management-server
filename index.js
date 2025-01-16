@@ -82,52 +82,6 @@ async function run() {
         };
 
 
-        // app.post('/jwt' , async(req, res)=>{
-        //     const user =req.body
-        //     const token= jwt.sign(user, process.env.SECRET_TOKEN, {expiresIn: '30d'})
-
-        //     res.send({token})
-        // })
-
-        // // middleware
-
-        // const verifyToken=async (req, res, next)=>{
-        //     console.log('inside Verify token->' ,req.headers)
-        //     if(!req?.headers?.authorization){
-        //     return res.status(401).send({massage: 'Unauthorize access'})
-        //     }
-        //     const token= req.headers.authorization.split(' ')[1]
-        //     jwt.verify(token, process.env.SECRET_TOKEN, (err, decoded)=>{
-        //         if(err){
-        //             return res.status(403).send({massage:'Forbidden access'})
-        //         }
-        //         req.decoded = decoded
-        //         next()
-        //     })
-        // }
-
-        // const verifyAdminAndModerator=async (req, res, next)=>{
-        //    // console.log("data from verifyToken middleware", req.user)
-        //    const email = req.user?.email
-        //    const query = { email }
-        //    const result = await usersCollections.findOne(query)
-        //    if (!result || result.role === 'user') {
-        //      return res.status(403).send({ massage: "Forbidden Access!, Admin And Moderator only action" })
-        //    }
-        //    next()
-        // }
-
-        // const verifyAdmin= async(req,res, next)=>{
-        //     const email= req.user?.email
-        //     const query={email}
-        //     const result= await usersCollections.findOne(query)
-        //     if(!result || result.role!== 'admin'){
-        //         return res.status(403).send({massage: "Forbidden Access!, Admin only action"})
-        //     }
-        //     next()
-        // }
-
-
 
         // User related api
 
@@ -181,12 +135,13 @@ async function run() {
         })
 
         // Scholar related api
+
         app.get('/scholars', async (req, res) => {
             const result = await scholarCollections.find().toArray()
             res.send(result)
         })
 
-        app.get('/scholar/:id', async (req, res) => {
+        app.get('/scholar/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const result = await scholarCollections.aggregate([
                 {
@@ -277,7 +232,7 @@ async function run() {
 
         //application related Api
 
-        app.get('/application/:email', async (req, res) => {
+        app.get('/application/:email', verifyToken, async (req, res) => {
             try {
                 const email = req.params.email;
                 const query = { applicantEmail: email };
@@ -372,9 +327,34 @@ async function run() {
 
         // review related api
 
+        app.get('/review/:email', verifyToken, async(req, res)=>{
+            const email= req.params.email
+            const query= { userEmail: email}
+            
+            const result= await reviewCollections.find(query).toArray()
+            res.send(result)
+        })
         app.post('/review', verifyToken, async(req, res)=>{
             const review= req.body
             const result= await reviewCollections.insertOne(review)
+            res.send(result)
+        })
+        app.put('/review/:id', verifyToken, async(req, res)=>{
+            const id= req.params.id
+            const filter= { _id :new ObjectId(id)}
+            const {rating,comment, userName, userEmail, }= req.body
+            const updateDoc={
+                $set:{
+                    rating,comment, userName, userEmail,
+                }
+            }
+            const result= await reviewCollections.updateOne( filter ,updateDoc)
+            res.send(result)
+        })
+        app.delete('/review/:id', verifyToken, async(req,res)=>{
+            const id= req.params.id
+            const query= {_id: new ObjectId(id)}
+            const result= await reviewCollections.deleteOne(query)
             res.send(result)
         })
 
