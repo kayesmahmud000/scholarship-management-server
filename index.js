@@ -31,6 +31,7 @@ async function run() {
         const scholarCollections = client.db('ScholarProDB').collection('scholarships')
         const usersCollections = client.db('ScholarProDB').collection('users')
         const applicationsCollections = client.db('ScholarProDB').collection('applications')
+        const reviewCollections = client.db('ScholarProDB').collection('reviews')
 
 
         //jwt related api
@@ -335,6 +336,16 @@ async function run() {
             console.log(result)
             res.send(result)
         })
+
+
+        // review related api
+
+        app.post('/review', verifyToken, async(req, res)=>{
+            const review= req.body
+            const result= await reviewCollections.insertOne(review)
+            res.send(result)
+        })
+
         // create payment intent
 
         app.post('/create-payment-intent', verifyToken, async (req, res) => {
