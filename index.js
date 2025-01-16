@@ -186,10 +186,42 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/scholar/:id', verifyToken, async (req, res) => {
+        app.get('/scholar/:id', async (req, res) => {
             const id = req.params.id
-            const query = { _id: new ObjectId(id) }
-            const result = await scholarCollections.findOne(query)
+            const result = await scholarCollections.aggregate([
+                {
+                    $match: { _id: new ObjectId(id) }  
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        let: { scholarshipId: "$_id" }, 
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: [
+                                            { $toObjectId: "$universityId" }, 
+                                            "$$scholarshipId"
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                $project: {  
+                                    _id: 0, 
+                                    reviewerImage: "$userPhoto",
+                                    reviewerName: "$userName",
+                                    reviewDate: "$reviewDate",
+                                    ratingPoint: "$rating",
+                                    reviewerComments: "$comment"
+                                }
+                            }
+                        ],
+                        as: 'reviews'
+                    }
+                }
+            ]).toArray();
             res.send(result)
         })
 
