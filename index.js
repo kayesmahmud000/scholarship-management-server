@@ -277,6 +277,10 @@ async function run() {
 
 
         //application related Api
+        app.get('/applications', verifyToken, async(req, res)=>{
+            const result= await applicationsCollections.find().toArray()
+            res.send(result)
+        })
 
         app.get('/application/:email', verifyToken, async (req, res) => {
             try {
@@ -346,6 +350,33 @@ async function run() {
             // console.log(applyEmail)
             // console.log(user._id.toString())
             const result = await applicationsCollections.insertOne({ ...application, userId: user._id.toString() })
+            res.send(result)
+        })
+        app.patch('/application/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
+            const id= req.params.id
+            const {feedback}= req.body
+            const filter= { _id: new ObjectId(id)}
+            const option ={upset:true}
+            const updateDoc= {
+                $set:{
+                    feedback
+                }
+            }
+            const result= await applicationsCollections.updateOne(filter, updateDoc, option)
+            console.log(result)
+            res.send(result)
+
+        })
+        app.patch('/application/status/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
+            const id= req.params.id
+            const filter= {_id: new ObjectId(id)}
+            const {status}= req.body
+            const updateDoc= {
+                $set:{
+                    status
+                }
+            }
+            const result= await applicationsCollections.updateOne(filter, updateDoc)
             res.send(result)
         })
         app.put('/application/:id', verifyToken, async (req, res) => {
@@ -419,6 +450,7 @@ async function run() {
             const result = await reviewCollections.insertOne(review)
             res.send(result)
         })
+    
         app.put('/review/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
