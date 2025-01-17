@@ -165,9 +165,11 @@ async function run() {
                     },
                     {
                         $project: {
-                           universityName: 1,
+                            scholarshipName:1,
+                            degree:1,
+                            universityName: 1,
                             universityLogo: 1,
-                            universityWorldRank:1,
+                            universityWorldRank: 1,
                             scholarshipCategory: 1,
                             universityCountry: 1,
                             universityCity: 1,
@@ -178,39 +180,37 @@ async function run() {
                         }
                     }
                 ]).toArray();
-        
+
                 res.send(result);
             } catch (error) {
                 res.status(500).send({ error: 'Failed to fetch scholars with ratings' });
             }
         });
-        
-        
 
         app.get('/scholar/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const result = await scholarCollections.aggregate([
                 {
-                    $match: { _id: new ObjectId(id) }  
+                    $match: { _id: new ObjectId(id) }
                 },
                 {
                     $lookup: {
                         from: 'reviews',
-                        let: { scholarshipId: "$_id" }, 
+                        let: { scholarshipId: "$_id" },
                         pipeline: [
                             {
                                 $match: {
                                     $expr: {
                                         $eq: [
-                                            { $toObjectId: "$universityId" }, 
+                                            { $toObjectId: "$universityId" },
                                             "$$scholarshipId"
                                         ]
                                     }
                                 }
                             },
                             {
-                                $project: {  
-                                    _id: 0, 
+                                $project: {
+                                    _id: 0,
                                     reviewerImage: "$userPhoto",
                                     reviewerName: "$userName",
                                     reviewDate: "$reviewDate",
@@ -232,7 +232,7 @@ async function run() {
             const result = await scholarCollections.deleteOne(query)
             res.send(result)
         })
-       
+
         app.put('/scholar/:id', verifyToken, verifyAdminAndModerator, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
@@ -282,7 +282,7 @@ async function run() {
             try {
                 const email = req.params.email;
                 const query = { applicantEmail: email };
-        
+
                 // Using aggregate directly instead of findOne
                 const result = await applicationsCollections.aggregate([
                     {
@@ -324,18 +324,18 @@ async function run() {
                         }
                     }
                 ]).toArray();
-        
+
                 res.send(result);
             } catch (error) {
                 console.error("Error fetching applications:", error);
                 res.status(500).send({ message: "Error fetching applications" });
             }
         });
-        
-        app.delete('/application/:id', verifyToken, async(req, res)=>{
-            const id= req.params.id
-            const query= {_id: new ObjectId(id)}
-            const result= await applicationsCollections.deleteOne(query)
+
+        app.delete('/application/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await applicationsCollections.deleteOne(query)
             res.send(result)
         })
         app.post('/application', verifyToken, async (req, res) => {
@@ -356,10 +356,10 @@ async function run() {
             const updateDoc = {
                 $set: {
                     phoneNumber, applicantName, applicantEmail, village, district,
-                country, gender, hscResult, studyGap, sscResult
+                    country, gender, hscResult, studyGap, sscResult
                 }
             }
-            const result = await applicationsCollections.updateOne( filter, updateDoc)
+            const result = await applicationsCollections.updateOne(filter, updateDoc)
             res.send(result)
         })
         app.get('/applications/:id', verifyToken, async (req, res) => {
@@ -372,38 +372,69 @@ async function run() {
 
 
         // review related api
-        app.get('/review', verifyToken, verifyAdminAndModerator, async(req, res)=>{
-            const result= await reviewCollections.find().toArray()
+        app.get('/reviews', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const result = await reviewCollections.aggregate([
+                {
+                    $addFields: {
+                        ObjectUniversityId: { $toObjectId: "$universityId" }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "scholarships",
+                        localField: "ObjectUniversityId",
+                        foreignField: "_id",
+                        as: 'scholars'
+
+                    }
+                },
+                {
+                    $unwind: '$scholars'
+                },
+                {
+                    $addFields: {
+                        subjectCategory: '$scholars.subjectCategory'
+                    }
+                },
+                {
+                    $project: {
+                        scholars: 0,
+                        ObjectUniversityId:0
+
+                    }
+                }
+
+            ]).toArray()
             res.send(result)
         })
-        app.get('/review/:email', verifyToken, async(req, res)=>{
-            const email= req.params.email
-            const query= { userEmail: email}
-            
-            const result= await reviewCollections.find(query).toArray()
+        app.get('/review/:email', verifyToken, async (req, res) => {
+            const email = req.params.email
+            const query = { userEmail: email }
+
+            const result = await reviewCollections.find(query).toArray()
             res.send(result)
         })
-        app.post('/review', verifyToken, async(req, res)=>{
-            const review= req.body
-            const result= await reviewCollections.insertOne(review)
+        app.post('/review', verifyToken, async (req, res) => {
+            const review = req.body
+            const result = await reviewCollections.insertOne(review)
             res.send(result)
         })
-        app.put('/review/:id', verifyToken, async(req, res)=>{
-            const id= req.params.id
-            const filter= { _id :new ObjectId(id)}
-            const {rating,comment, userName, userEmail, }= req.body
-            const updateDoc={
-                $set:{
-                    rating,comment, userName, userEmail,
+        app.put('/review/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const { rating, comment, userName, userEmail, } = req.body
+            const updateDoc = {
+                $set: {
+                    rating, comment, userName, userEmail,
                 }
             }
-            const result= await reviewCollections.updateOne( filter ,updateDoc)
+            const result = await reviewCollections.updateOne(filter, updateDoc)
             res.send(result)
         })
-        app.delete('/review/:id', verifyToken, async(req,res)=>{
-            const id= req.params.id
-            const query= {_id: new ObjectId(id)}
-            const result= await reviewCollections.deleteOne(query)
+        app.delete('/review/:id', verifyToken, async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await reviewCollections.deleteOne(query)
             res.send(result)
         })
 
