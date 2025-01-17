@@ -186,7 +186,57 @@ async function run() {
                 res.status(500).send({ error: 'Failed to fetch scholars with ratings' });
             }
         });
-
+        app.get('/latest-scholar', async(req, res)=>{
+            const result= await scholarCollections.aggregate([
+                {
+                    $addFields: {
+                        universityIdString: { $toString: "$_id" }  // Convert _id to string for matching
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'reviews',
+                        localField: 'universityIdString',
+                        foreignField: 'universityId',  // Match the universityId
+                        as: 'reviews'
+                    }
+                },
+                {
+                    $addFields: {
+                        averageRating: {
+                            $cond: {
+                                if: { $gt: [{ $size: "$reviews" }, 0] },
+                                then: { $avg: "$reviews.rating" },
+                                else: 0
+                            }
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        scholarshipName:1,
+                        degree:1,
+                        universityName: 1,
+                        universityLogo: 1,
+                        universityWorldRank: 1,
+                        scholarshipCategory: 1,
+                        universityCountry: 1,
+                        universityCity: 1,
+                        applicationDeadline: 1,
+                        subjectCategory: 1,
+                        applicationFees: 1,
+                        averageRating: { $round: ["$averageRating", 1] }  
+                    }
+                },
+                {
+                    $sort: { _id: -1 } 
+                },
+                {
+                    $limit: 6 
+                }
+            ]).toArray()
+            res.send(result) 
+        })
         app.get('/scholar/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const result = await scholarCollections.aggregate([
@@ -277,7 +327,7 @@ async function run() {
 
 
         //application related Api
-        app.get('/applications', verifyToken, async(req, res)=>{
+        app.get('/applications', verifyToken, verifyAdminAndModerator,  async(req, res)=>{
             const result= await applicationsCollections.find().toArray()
             res.send(result)
         })
