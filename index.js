@@ -89,7 +89,7 @@ async function run() {
             const result = await usersCollections.find().toArray()
             res.send(result)
         })
-        app.patch('/user/:email', verifyAdmin, async (req, res) => {
+        app.patch('/user/:email', verifyToken, verifyAdmin, async (req, res) => {
             const email = req.params.email
             const filter = { email }
             const { role } = req.body
@@ -137,9 +137,55 @@ async function run() {
         // Scholar related api
 
         app.get('/scholars', async (req, res) => {
-            const result = await scholarCollections.find().toArray()
-            res.send(result)
-        })
+            try {
+                const result = await scholarCollections.aggregate([
+                    {
+                        $addFields: {
+                            universityIdString: { $toString: "$_id" }  // Convert _id to string for matching
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'reviews',
+                            localField: 'universityIdString',
+                            foreignField: 'universityId',  // Match the universityId
+                            as: 'reviews'
+                        }
+                    },
+                    {
+                        $addFields: {
+                            averageRating: {
+                                $cond: {
+                                    if: { $gt: [{ $size: "$reviews" }, 0] },
+                                    then: { $avg: "$reviews.rating" },
+                                    else: 0
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                           universityName: 1,
+                            universityLogo: 1,
+                            universityWorldRank:1,
+                            scholarshipCategory: 1,
+                            universityCountry: 1,
+                            universityCity: 1,
+                            applicationDeadline: 1,
+                            subjectCategory: 1,
+                            applicationFees: 1,
+                            averageRating: { $round: ["$averageRating", 1] }  // Round rating to 1 decimal
+                        }
+                    }
+                ]).toArray();
+        
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ error: 'Failed to fetch scholars with ratings' });
+            }
+        });
+        
+        
 
         app.get('/scholar/:id', verifyToken, async (req, res) => {
             const id = req.params.id
@@ -186,7 +232,7 @@ async function run() {
             const result = await scholarCollections.deleteOne(query)
             res.send(result)
         })
-
+       
         app.put('/scholar/:id', verifyToken, verifyAdminAndModerator, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
@@ -326,7 +372,10 @@ async function run() {
 
 
         // review related api
-
+        app.get('/review', verifyToken, verifyAdminAndModerator, async(req, res)=>{
+            const result= await reviewCollections.find().toArray()
+            res.send(result)
+        })
         app.get('/review/:email', verifyToken, async(req, res)=>{
             const email= req.params.email
             const query= { userEmail: email}
