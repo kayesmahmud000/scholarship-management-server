@@ -32,6 +32,7 @@ async function run() {
         const usersCollections = client.db('ScholarProDB').collection('users')
         const applicationsCollections = client.db('ScholarProDB').collection('applications')
         const reviewCollections = client.db('ScholarProDB').collection('reviews')
+        const countryCollections = client.db('ScholarProDB').collection('countries')
 
 
         //jwt related api
@@ -573,6 +574,35 @@ async function run() {
             const result = await reviewCollections.deleteOne(query)
             res.send(result)
         })
+
+        // states / chart related Api
+        app.get('/scholarship-category-states', verifyToken, verifyAdmin,  async(req, res)=>{
+            const chartData= await applicationsCollections.aggregate(
+                [
+                    {
+                        $group:{
+                            _id:'$scholarInfo.scholarshipCategory',
+                            application: {$sum:1}
+                        }
+                    },
+                    {
+                        $project:{
+                            category:"$_id",
+                            application:1,
+                            _id:0
+                        }
+                    }
+                ]
+            ).toArray()
+            console.log(chartData)
+            res.send({chartData})
+        })
+        // contrary related api
+        app.get('/countries', async(req, res)=>{
+            const result= await countryCollections.find().toArray()
+            res.send(result)
+        })
+
 
         // create payment intent
 
