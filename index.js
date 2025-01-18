@@ -137,8 +137,30 @@ async function run() {
         // Scholar related api
 
         app.get('/scholars', async (req, res) => {
+            const { search, page, limit } = req.query
+            const pageInt= parseInt(page)
+            const limitInt= parseInt(limit)
+            console.log(pageInt, limitInt)
+            const searchQuery = search ? {
+                $or: [
+                    {
+                        scholarshipName: { $regex: search, $options: 'i' }
+                    },
+                    {
+                        universityName: { $regex: search, $options: 'i' }
+                    },
+                    {
+
+                        degree: { $regex: search, $options: 'i'}
+
+                    }
+                ]
+            } : {}
             try {
                 const result = await scholarCollections.aggregate([
+                    {
+                        $match: searchQuery
+                    },
                     {
                         $addFields: {
                             universityIdString: { $toString: "$_id" }  // Convert _id to string for matching
@@ -165,8 +187,8 @@ async function run() {
                     },
                     {
                         $project: {
-                            scholarshipName:1,
-                            degree:1,
+                            scholarshipName: 1,
+                            degree: 1,
                             universityName: 1,
                             universityLogo: 1,
                             universityWorldRank: 1,
@@ -178,6 +200,12 @@ async function run() {
                             applicationFees: 1,
                             averageRating: { $round: ["$averageRating", 1] }  // Round rating to 1 decimal
                         }
+                    },
+                    {
+                        $skip:pageInt * limitInt
+                    },
+                    {
+                        $limit: limitInt
                     }
                 ]).toArray();
 
@@ -186,8 +214,17 @@ async function run() {
                 res.status(500).send({ error: 'Failed to fetch scholars with ratings' });
             }
         });
-        app.get('/latest-scholar', async(req, res)=>{
-            const result= await scholarCollections.aggregate([
+        app.get('/all-scholar', verifyToken, verifyAdminAndModerator, async(req, res)=>{
+            const result= await scholarCollections.find().toArray()
+            res.send(result)
+        })
+
+        app.get('/scholar-count', async(req ,res)=>{
+            const count= await scholarCollections.estimatedDocumentCount()
+            res.send({count})
+        })
+        app.get('/latest-scholar', async (req, res) => {
+            const result = await scholarCollections.aggregate([
                 {
                     $addFields: {
                         universityIdString: { $toString: "$_id" }  // Convert _id to string for matching
@@ -214,8 +251,8 @@ async function run() {
                 },
                 {
                     $project: {
-                        scholarshipName:1,
-                        degree:1,
+                        scholarshipName: 1,
+                        degree: 1,
                         universityName: 1,
                         universityLogo: 1,
                         universityWorldRank: 1,
@@ -225,17 +262,17 @@ async function run() {
                         applicationDeadline: 1,
                         subjectCategory: 1,
                         applicationFees: 1,
-                        averageRating: { $round: ["$averageRating", 1] }  
+                        averageRating: { $round: ["$averageRating", 1] }
                     }
                 },
                 {
-                    $sort: { _id: -1 } 
+                    $sort: { applicationFees: 1, _id: -1 }
                 },
                 {
-                    $limit: 6 
+                    $limit: 6
                 }
             ]).toArray()
-            res.send(result) 
+            res.send(result)
         })
         app.get('/scholar/:id', verifyToken, async (req, res) => {
             const id = req.params.id
@@ -327,8 +364,8 @@ async function run() {
 
 
         //application related Api
-        app.get('/applications', verifyToken, verifyAdminAndModerator,  async(req, res)=>{
-            const result= await applicationsCollections.find().toArray()
+        app.get('/applications', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const result = await applicationsCollections.find().toArray()
             res.send(result)
         })
 
@@ -402,31 +439,43 @@ async function run() {
             const result = await applicationsCollections.insertOne({ ...application, userId: user._id.toString() })
             res.send(result)
         })
-        app.patch('/application/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
-            const id= req.params.id
-            const {feedback}= req.body
-            const filter= { _id: new ObjectId(id)}
-            const option ={upset:true}
-            const updateDoc= {
-                $set:{
+        app.patch('/application/new-status/:id', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const { status } = req.body
+            const updateDoc = {
+                $set: {
+                    status
+                }
+            }
+            const result = await applicationsCollections.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+        app.patch('/application/:id', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const id = req.params.id
+            const { feedback } = req.body
+            const filter = { _id: new ObjectId(id) }
+            const option = { upset: true }
+            const updateDoc = {
+                $set: {
                     feedback
                 }
             }
-            const result= await applicationsCollections.updateOne(filter, updateDoc, option)
+            const result = await applicationsCollections.updateOne(filter, updateDoc, option)
             console.log(result)
             res.send(result)
 
         })
-        app.patch('/application/status/:id', verifyToken, verifyAdminAndModerator, async(req, res)=>{
-            const id= req.params.id
-            const filter= {_id: new ObjectId(id)}
-            const {status}= req.body
-            const updateDoc= {
-                $set:{
+        app.patch('/application/status/:id', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const { status } = req.body
+            const updateDoc = {
+                $set: {
                     status
                 }
             }
-            const result= await applicationsCollections.updateOne(filter, updateDoc)
+            const result = await applicationsCollections.updateOne(filter, updateDoc)
             res.send(result)
         })
         app.put('/application/:id', verifyToken, async (req, res) => {
@@ -480,7 +529,7 @@ async function run() {
                 {
                     $project: {
                         scholars: 0,
-                        ObjectUniversityId:0
+                        ObjectUniversityId: 0
 
                     }
                 }
@@ -500,7 +549,7 @@ async function run() {
             const result = await reviewCollections.insertOne(review)
             res.send(result)
         })
-    
+
         app.put('/review/:id', verifyToken, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
