@@ -137,92 +137,97 @@ async function run() {
         // Scholar related api
 
         app.get('/scholars', async (req, res) => {
-            const { search, page, limit } = req.query
-            const pageInt= parseInt(page)
-            const limitInt= parseInt(limit)
-            console.log(pageInt, limitInt)
-            const searchQuery = search ? {
-                $or: [
-                    {
-                        scholarshipName: { $regex: search, $options: 'i' }
-                    },
-                    {
-                        universityName: { $regex: search, $options: 'i' }
-                    },
-                    {
+            const { search, page, limit } = req.query;
+            const pageInt = parseInt(page) || 0; // Default to 0 if not provided
+            const limitInt = parseInt(limit) || 10; // Default to 10 if not provided
 
-                        degree: { $regex: search, $options: 'i'}
+            const searchQuery = search
+                ? {
+                    $or: [
+                        { scholarshipName: { $regex: search, $options: 'i' } },
+                        { universityName: { $regex: search, $options: 'i' } },
+                        { degree: { $regex: search, $options: 'i' } },
+                    ],
+                }
+                : {};
 
-                    }
-                ]
-            } : {}
             try {
-                const result = await scholarCollections.aggregate([
-                    {
-                        $match: searchQuery
-                    },
-                    {
-                        $addFields: {
-                            universityIdString: { $toString: "$_id" }  // Convert _id to string for matching
-                        }
-                    },
-                    {
-                        $lookup: {
-                            from: 'reviews',
-                            localField: 'universityIdString',
-                            foreignField: 'universityId',  // Match the universityId
-                            as: 'reviews'
-                        }
-                    },
-                    {
-                        $addFields: {
-                            averageRating: {
-                                $cond: {
-                                    if: { $gt: [{ $size: "$reviews" }, 0] },
-                                    then: { $avg: "$reviews.rating" },
-                                    else: 0
-                                }
-                            }
-                        }
-                    },
-                    {
-                        $project: {
-                            scholarshipName: 1,
-                            degree: 1,
-                            universityName: 1,
-                            universityLogo: 1,
-                            universityWorldRank: 1,
-                            scholarshipCategory: 1,
-                            universityCountry: 1,
-                            universityCity: 1,
-                            applicationDeadline: 1,
-                            subjectCategory: 1,
-                            applicationFees: 1,
-                            averageRating: { $round: ["$averageRating", 1] }  // Round rating to 1 decimal
-                        }
-                    },
-                    {
-                        $skip:pageInt * limitInt
-                    },
-                    {
-                        $limit: limitInt
-                    }
-                ]).toArray();
+                // Count the total number of matching documents
+                const totalCount = await scholarCollections.countDocuments(searchQuery);
 
-                res.send(result);
+                // Fetch the paginated results
+                const result = await scholarCollections
+                    .aggregate([
+                        {
+                            $match: searchQuery,
+                        },
+                        {
+                            $addFields: {
+                                universityIdString: { $toString: '$_id' }, // Convert _id to string for matching
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'reviews',
+                                localField: 'universityIdString',
+                                foreignField: 'universityId', // Match the universityId
+                                as: 'reviews',
+                            },
+                        },
+                        {
+                            $addFields: {
+                                averageRating: {
+                                    $cond: {
+                                        if: { $gt: [{ $size: '$reviews' }, 0] },
+                                        then: { $avg: '$reviews.rating' },
+                                        else: 0,
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                scholarshipName: 1,
+                                degree: 1,
+                                universityName: 1,
+                                universityLogo: 1,
+                                universityWorldRank: 1,
+                                scholarshipCategory: 1,
+                                universityCountry: 1,
+                                universityCity: 1,
+                                applicationDeadline: 1,
+                                subjectCategory: 1,
+                                applicationFees: 1,
+                                averageRating: { $round: ['$averageRating', 1] }, // Round rating to 1 decimal
+                            },
+                        },
+                        {
+                            $skip: pageInt * limitInt, // Skip documents for pagination
+                        },
+                        {
+                            $limit: limitInt, // Limit the number of documents
+                        },
+                    ])
+                    .toArray();
+
+                // Send the results and the total count
+                res.send({
+                    data: result,
+                    totalCount, // Total matching documents
+                    totalPages: Math.ceil(totalCount / limitInt), // Total pages
+                    currentPage: pageInt + 1, // Current page (adjusted for 1-based indexing)
+                });
             } catch (error) {
+                console.error('Error fetching scholars:', error);
                 res.status(500).send({ error: 'Failed to fetch scholars with ratings' });
             }
         });
-        app.get('/all-scholar', verifyToken, verifyAdminAndModerator, async(req, res)=>{
-            const result= await scholarCollections.find().toArray()
+        app.get('/all-scholar', verifyToken, verifyAdminAndModerator, async (req, res) => {
+            const result = await scholarCollections.find().toArray()
             res.send(result)
         })
 
-        app.get('/scholar-count', async(req ,res)=>{
-            const count= await scholarCollections.estimatedDocumentCount()
-            res.send({count})
-        })
+       
         app.get('/latest-scholar', async (req, res) => {
             const result = await scholarCollections.aggregate([
                 {
