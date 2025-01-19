@@ -27,7 +27,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
         const scholarCollections = client.db('ScholarProDB').collection('scholarships')
         const usersCollections = client.db('ScholarProDB').collection('users')
         const applicationsCollections = client.db('ScholarProDB').collection('applications')
@@ -363,7 +363,7 @@ async function run() {
         })
         app.post('/scholarship', verifyToken, verifyAdminAndModerator, async (req, res) => {
             const scholarData = req.body
-            console.log(scholarData)
+            // console.log(scholarData)
             const result = await scholarCollections.insertOne(scholarData)
             res.send(result)
         })
@@ -468,7 +468,7 @@ async function run() {
                 }
             }
             const result = await applicationsCollections.updateOne(filter, updateDoc, option)
-            console.log(result)
+            // console.log(result)
             res.send(result)
 
         })
@@ -502,7 +502,7 @@ async function run() {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await applicationsCollections.findOne(query)
-            console.log(result)
+            // console.log(result)
             res.send(result)
         })
 
@@ -594,7 +594,7 @@ async function run() {
                     }
                 ]
             ).toArray()
-            console.log(chartData)
+            // console.log(chartData)
             res.send({chartData})
         })
         // contrary related api
@@ -624,8 +624,8 @@ async function run() {
 
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
@@ -639,5 +639,5 @@ app.get('/', (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log(`Scholar Track server running on port : ${port} `)
+    // console.log(`Scholar Track server running on port : ${port} `)
 })
