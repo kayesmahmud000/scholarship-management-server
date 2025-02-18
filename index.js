@@ -275,7 +275,7 @@ async function run() {
                     $sort: { applicationFees: 1, _id: -1 }
                 },
                 {
-                    $limit: 6
+                    $limit: 8
                 }
             ]).toArray()
             res.send(result)
